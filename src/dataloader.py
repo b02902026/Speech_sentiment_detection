@@ -11,9 +11,12 @@ class IEMOCAP(Dataset):
     
     def __getitem__(self, index):
         y, sr = librosa.load(self.data[index]['wav_path'])
-        mfcc = librosa.feature.mfcc(y=y, sr=sr)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
         label = self.data[index]['category']
-        text = self.data[index]['text'] if "text" in self.data[index] else ""
+        if "text" in self.data[index]:
+            text = self.data[index]['text']
+        else:
+            text = ""
         return mfcc, label, text
     
     def __len__(self):
@@ -25,7 +28,7 @@ class IEMOCAP(Dataset):
         length = [x.shape[1] for x in mfcc]
         max_len = length[0]
         for i, feat in enumerate(mfcc):
-            mfcc[i] = np.concatenate((feat, np.zeros((20, max_len-feat.shape[1]))), axis=1)
+            mfcc[i] = np.concatenate((feat, np.zeros((40, max_len-feat.shape[1]))), axis=1)
         
         return th.FloatTensor(mfcc).transpose(1,2), length, th.LongTensor(label), text
 

@@ -10,7 +10,7 @@ import argparse
 def training(trainloader, valloader, class_num):
     
     loss_fn = nn.CrossEntropyLoss()
-    model = SER(h_size=256, feat_size=20, class_num=class_num)
+    model = SER(h_size=128, feat_size=40, class_num=class_num)
     optim = Adam(model.parameters(), lr = 1e-3)
     epoch = 10
     for e in range(epoch):
@@ -18,7 +18,6 @@ def training(trainloader, valloader, class_num):
         for i, (feat, length, labels, text) in enumerate(trainloader):
             optim.zero_grad()
             pred = model(feat, length) 
-            print(text, labels)
             loss = loss_fn(pred, labels)
             loss.backward()
             optim.step()

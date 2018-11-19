@@ -11,8 +11,8 @@ class SER(nn.Module):
         self.transform = nn.Linear(self.input_size, self.hidden_size)
         self.rnn = nn.LSTM(self.hidden_size, self.hidden_size, batch_first=True, bidirectional=True)
         self.output_fc = nn.Linear(self.hidden_size * 2, class_num)
-        self.attention_parameter = nn.Parameter(th.zeros(self.hidden_size*2, self.hidden_size*2))
-        th.nn.init.xavier_uniform_(self.attention_parameter)
+        #self.attention_parameter = nn.Parameter(th.zeros(self.hidden_size*2, self.hidden_size*2))
+        #th.nn.init.xavier_uniform_(self.attention_parameter)
 
     def forward(self, x, lengths):
         x = self.transform(x) # (B, S, H)

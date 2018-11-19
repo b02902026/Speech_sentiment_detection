@@ -40,13 +40,13 @@ def get_wav_feature(file_dir, wav_dict):
         sec_dir = os.path.join(file_dir, dir_name)
         for file_name in os.listdir(sec_dir):
             file_path = os.path.join(sec_dir, file_name)
-            try:
+            if not file_path.endswith('.pk'):
                 #y, sr = librosa.load(file_path)
                 #mfcc = librosa.feature.mfcc(y=y, sr=sr)
                 name = file_name.split('.')[0]
                 #wav_dict[name]["feat"] = mfcc
                 wav_dict[name]["wav_path"] = file_path
-            except:
+            else:
                 print("{} fail".format(file_path))
 
 
@@ -55,16 +55,25 @@ def recategorize_and_split(json_path):
         data = json.load(f)
 
     class_map = {'ang':0, 'exc':1, 'fru':2, 'hap':3, 'neu':4, 'sad':5}
+    counter = {}
     small_data = []
     for instance in data:
-        if instance['category'] in class_map:
-            instance['category'] = class_map[instance['category']]
+        cat = instance['category']
+        if cat not in counter:
+            counter[cat] = 1
+        else:
+            counter[cat] += 1
+
+        if cat in class_map:
+            instance['category'] = class_map[cat]
             small_data.append(instance)
 
+    print(counter)
+    print()
     train_size = int(len(small_data) * 0.9)
     print("new train size: ", train_size)
     with open('../data/train.json', 'w+') as f:
-        json.dump(small_data[:train_size], f)
+        json.dump(small_data[:train_size], f, indent=4)
     with open('../data/val.json', 'w+') as f:
         json.dump(small_data[train_size:], f)
     
@@ -87,6 +96,6 @@ if __name__ == "__main__":
         exp_dict[k]['id'] = k
         exps.append(exp_dict[k])
 
-    with open('data.json', 'w') as f:
-        json.dump(exps, f)
+    with open('../data/data.json', 'w') as f:
+        json.dump(exps, f, indent=4)
 
