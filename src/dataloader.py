@@ -10,9 +10,9 @@ class IEMOCAP(Dataset):
             self.data = json.load(f)
     
     def __getitem__(self, index):
-        y, sr = librosa.load(self.data[index]['wav_path'])
-        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
-        label = self.data[index]['category']
+        y, sr = librosa.load(self.data[index]['wav_path'], sr=11025)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40).T
+        label = self.data[index]['category_index']
         if "text" in self.data[index]:
             text = self.data[index]['text']
         else:
@@ -23,14 +23,14 @@ class IEMOCAP(Dataset):
         return len(self.data)
     
     def collate_fn(self, b):
-        b = sorted(b, key=lambda x:x[0].shape[1], reverse=True)
+        b = sorted(b, key=lambda x:x[0].shape[0], reverse=True)
         mfcc, label, text = map(list,zip(*b))
-        length = [x.shape[1] for x in mfcc]
+        length = [x.shape[0] for x in mfcc]
         max_len = length[0]
         for i, feat in enumerate(mfcc):
-            mfcc[i] = np.concatenate((feat, np.zeros((40, max_len-feat.shape[1]))), axis=1)
+            mfcc[i] = np.concatenate((feat, np.zeros((max_len-feat.shape[0], 40))), axis=0)
         
-        return th.FloatTensor(mfcc).transpose(1,2), length, th.LongTensor(label), text
+        return th.FloatTensor(mfcc), length, th.LongTensor(label), text
 
 def get_dataloader(path, batch_size, shuffle):
     IEMO = IEMOCAP(path)

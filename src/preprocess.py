@@ -1,8 +1,8 @@
 import argparse
 import os
 import json
-import librosa
 import pickle
+import librosa
 
 def get_labels(file_dir, label_dict):
     for file_name in os.listdir(file_dir):
@@ -15,13 +15,15 @@ def get_labels(file_dir, label_dict):
                     continue
                 prefix = file_name.split('.')[0]
                 start = line.find(prefix)
+                if start == -1:
+                    raise Exception("sth goes weong...")
                 line = line[start:]
                 name = line.split()[0]
                 category_label = line.split()[1]
-                start = line.find('[')
-                line = line[start+1:-1]
-                dimensional_label = line.split()
-                label_dict[name] = {"category":category_label, "dimensional":dimensional_label}
+                #start = line.find('[')
+                #line = line[start+1:-1]
+                #dimensional_label = line.split()
+                label_dict[name] = {"category":category_label}
 
 def get_text(file_dir, d):
     for file_name in os.listdir(file_dir):
@@ -40,7 +42,7 @@ def get_wav_feature(file_dir, wav_dict):
         sec_dir = os.path.join(file_dir, dir_name)
         for file_name in os.listdir(sec_dir):
             file_path = os.path.join(sec_dir, file_name)
-            if not file_path.endswith('.pk'):
+            if file_path.endswith('.wav'):
                 #y, sr = librosa.load(file_path)
                 #mfcc = librosa.feature.mfcc(y=y, sr=sr)
                 name = file_name.split('.')[0]
@@ -65,29 +67,30 @@ def recategorize_and_split(json_path):
             counter[cat] += 1
 
         if cat in class_map:
-            instance['category'] = class_map[cat]
+            instance['category_index'] = class_map[cat]
             small_data.append(instance)
 
-    print(counter)
-    print()
     train_size = int(len(small_data) * 0.9)
+    #train_size = 20
+    print("statistics:")
+    print(counter)
     print("new train size: ", train_size)
+
     with open('../data/train.json', 'w+') as f:
         json.dump(small_data[:train_size], f, indent=4)
     with open('../data/val.json', 'w+') as f:
-        json.dump(small_data[train_size:], f)
+        json.dump(small_data[train_size:], f, indent=4)
     
     return len(class_map)
 
 
 if __name__ == "__main__":
     exp_dict = {}
-    get_labels('../data/IEMOCAP_full_release/Session1/dialog/EmoEvaluation', exp_dict)
-    get_labels('../data/IEMOCAP_full_release/Session2/dialog/EmoEvaluation', exp_dict)
-    get_wav_feature('../data/IEMOCAP_full_release/Session1/sentences/wav', exp_dict)
-    get_wav_feature('../data/IEMOCAP_full_release/Session2/sentences/wav', exp_dict)
-    get_text('../data/IEMOCAP_full_release/Session1/dialog/transcriptions', exp_dict)
-    get_text('../data/IEMOCAP_full_release/Session2/dialog/transcriptions', exp_dict)
+    SESS_N = 2
+    for i in range(1, SESS_N+1):
+        get_labels('../data/IEMOCAP_full_release/Session{}/dialog/EmoEvaluation'.format(i), exp_dict)
+        get_wav_feature('../data/IEMOCAP_full_release/Session{}/sentences/wav'.format(i), exp_dict)
+        get_text('../data/IEMOCAP_full_release/Session{}/dialog/transcriptions'.format(i), exp_dict)
 
     #with open('examples.pkl', 'wb') as f:
     #    pickle.dump(exp_dict, f)
@@ -98,4 +101,6 @@ if __name__ == "__main__":
 
     with open('../data/data.json', 'w') as f:
         json.dump(exps, f, indent=4)
+
+    #recategorize_and_split('../data/data.json')
 
