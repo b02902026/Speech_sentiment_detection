@@ -8,16 +8,23 @@ from preprocess import recategorize_and_split
 import argparse
 import time
 
+USE_GPU = True
 def training(trainloader, valloader, class_num):
-    
     loss_fn = nn.CrossEntropyLoss()
     model = SER(h_size=200, feat_size=40, class_num=class_num)
+    if USE_GPU:
+        model.cuda()
     optim = Adam(model.parameters(), lr = 1e-4)
     epoch = 100
     for e in range(epoch):
         total_loss = 0
         start_time = time.time()
         for i, (feat, length, labels, text) in enumerate(trainloader):
+            # run on GPU
+            if USE_GPU:
+                feat = feat.cuda()
+                labels = labels.cuda()
+
             optim.zero_grad()
             pred = model(feat, length) 
             loss = loss_fn(pred, labels)
@@ -37,6 +44,9 @@ def evaluation(model, loader):
     total = 0
     correct = 0
     for i, (feat, length, labels, _) in enumerate(loader):
+        if USE_GPU:
+            feat = feat.cuda()
+            labels = labels.cuda()
         B = feat.size(0)
         pred = model(feat, length) 
         _, c = pred.max(dim=1)
@@ -51,6 +61,9 @@ def validation(model, valloader, loss_fn):
     model.eval()
     total_loss = 0
     for i, (feat, length, labels, _) in enumerate(valloader):
+        if USE_GPU:
+            feat = feat.cuda()
+            labels = labels.cuda()
         pred = model(feat, length) 
         loss = loss_fn(pred, labels)
         total_loss += loss.data.item()
