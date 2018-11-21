@@ -3,6 +3,56 @@ import os
 import json
 import pickle
 import librosa
+import collections
+import spacy
+import numpy as np
+
+PREFIX = '../data'
+nlp = spacy.blank('en')
+
+def load_embedding(vocab, path, dimension=300):
+    print('loading glove {} d'.format(dimension))
+    embed = np.random.normal(0, 1, size=(len(vocab), dimension))
+    embed[vocab('<pad>')] = np.zeros((dimension))
+    with open(path, 'r', encoding="utf-8") as f:
+        for line in f:
+            tmp = line.strip().split()
+            word = tmp[0]
+            vec = list(map(float, tmp[1:]))
+            if word in vocab.word2idx:
+                embed[vocab(word)] = vec
+    
+    with open(os.path.join(PREFIX, "glove.6B.%dd-relativized.pkl" % dimension), 'wb') as f:
+        pickle.dump(embed, f)
+
+def tokenize(s):
+    s = s.lower()
+    doc = nlp(s)
+    tokens = [token.text for token in doc]
+    return tokens
+
+class Vocabulary:
+    def __init__(self):
+        self.word2idx = {'<pad>': 0, '<unk>': 1}
+        self.idx2word = ['<pad>', '<unk>']
+
+    def add(self, word):
+        if word not in self.word2idx:
+            self.word2idx[word] = len(self.idx2word)
+            self.idx2word.append(word)
+
+    def __call__(self, word):
+        if word not in self.word2idx:
+            return self.word2idx['<unk>']
+        return self.word2idx[word]
+    
+    def build(self, counter, threshold=1):
+        for w, count in counter.items():
+            if count >= threshold:
+                self.add(w)
+    
+    def __len__(self):
+        return len(self.word2idx)
 
 def get_labels(file_dir, label_dict):
     for file_name in os.listdir(file_dir):
@@ -25,7 +75,7 @@ def get_labels(file_dir, label_dict):
                 #dimensional_label = line.split()
                 label_dict[name] = {"category":category_label}
 
-def get_text(file_dir, d):
+def get_text(file_dir, d, w_counter):
     for file_name in os.listdir(file_dir):
         file_path = os.path.join(file_dir, file_name)
         with open(file_path, 'r') as f:
@@ -33,7 +83,10 @@ def get_text(file_dir, d):
                 name = line.split('[')[0].strip()
                 text = line.split(':')[1].strip()
                 try:
+                    tokens = tokenize(text)
                     d[name]['text'] = text
+                    d[name]['text_tokens'] = tokens
+                    w_counter.update(tokens)
                 except KeyError:
                     print("Can't parse {}".format(name))
 
@@ -85,18 +138,24 @@ def recategorize_and_split(json_path):
 
 
 if __name__ == "__main__":
+    w_counter = collections.Counter()
+    vocab = Vocabulary()
     exp_dict = {}
-    SESS_N = 2
+    SESS_N = 5
     for i in range(1, SESS_N+1):
         get_labels('../data/IEMOCAP_full_release/Session{}/dialog/EmoEvaluation'.format(i), exp_dict)
         get_wav_feature('../data/IEMOCAP_full_release/Session{}/sentences/wav'.format(i), exp_dict)
-        get_text('../data/IEMOCAP_full_release/Session{}/dialog/transcriptions'.format(i), exp_dict)
+        get_text('../data/IEMOCAP_full_release/Session{}/dialog/transcriptions'.format(i), exp_dict, w_counter)
+    print("Build Vocabulary...")
+    vocab.build(w_counter)
+    print("%d words in total" % len(vocab))
 
     #with open('examples.pkl', 'wb') as f:
     #    pickle.dump(exp_dict, f)
     exps = []
     for k, v in exp_dict.items():
         exp_dict[k]['id'] = k
+        exp_dict[k]['tokens_id'] = list(map(vocab, exp_dict[k]['text_tokens']))
         exps.append(exp_dict[k])
 
     with open('../data/data.json', 'w') as f:
@@ -104,3 +163,9 @@ if __name__ == "__main__":
 
     #recategorize_and_split('../data/data.json')
 
+    with open('../data/vocab.pkl','wb') as f:
+        pickle.dump(vocab, f)
+    load_embedding(vocab, '../data/glove.6B.50d.txt', 50)
+    load_embedding(vocab, '../data/glove.6B.100d.txt', 100)
+    load_embedding(vocab, '../data/glove.6B.200d.txt', 200)
+    load_embedding(vocab, '../data/glove.6B.300d.txt', 300)

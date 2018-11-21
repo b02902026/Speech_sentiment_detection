@@ -13,24 +13,32 @@ class IEMOCAP(Dataset):
         y, sr = librosa.load(self.data[index]['wav_path'], sr=11025)
         mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40).T
         label = self.data[index]['category_index']
-        if "text" in self.data[index]:
-            text = self.data[index]['text']
-        else:
-            text = ""
-        return mfcc, label, text
+        #if "text" in self.data[index]:
+        #    text = self.data[index]['text']
+        #else:
+        #    text = ""
+        tokens_id = self.data[index]['tokens_id']
+        return mfcc, label, tokens_id
     
     def __len__(self):
         return len(self.data)
     
     def collate_fn(self, b):
         b = sorted(b, key=lambda x:x[0].shape[0], reverse=True)
-        mfcc, label, text = map(list,zip(*b))
-        length = [x.shape[0] for x in mfcc]
-        max_len = length[0]
+        #mfcc, label, text = map(list,zip(*b))
+        mfcc, label, tokens_id = map(list,zip(*b))
+        # mfcc padding
+        mfcc_length = [x.shape[0] for x in mfcc]
+        mfcc_max_len = mfcc_length[0]
         for i, feat in enumerate(mfcc):
-            mfcc[i] = np.concatenate((feat, np.zeros((max_len-feat.shape[0], 40))), axis=0)
+            mfcc[i] = np.concatenate((feat, np.zeros((mfcc_max_len-feat.shape[0], 40))), axis=0)
+        # tokens_id padding
+        tok_length = [len(x) for x in tokens_id]
+        tok_max_len = max(tok_length)
+        for i, token_id in enumerate(tokens_id):
+            tokens_id[i] += [0]*(tok_max_len - len(token_id))
         
-        return th.FloatTensor(mfcc), length, th.LongTensor(label), text
+        return th.FloatTensor(mfcc), mfcc_length, th.LongTensor(label), th.LongTensor(tokens_id), tok_length
 
 def get_dataloader(path, batch_size, shuffle):
     IEMO = IEMOCAP(path)
