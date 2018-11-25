@@ -3,6 +3,7 @@ import os
 import json
 import pickle
 import librosa
+from pyAudioAnalysis import audioFeatureExtraction, audioBasicIO
 import collections
 import spacy
 import numpy as np
@@ -106,10 +107,13 @@ def get_wav_feature(file_dir, wav_dict):
 
 
 def recategorize_and_split(json_path):
-    with open(json_path, 'r') as f:
-        data = json.load(f)
+    #with open(json_path, 'r') as f:
+    #    data = json.load(f)
+    with open(json_path, 'rb') as f:
+        data = pickle.load(f)
 
-    class_map = {'ang':0, 'exc':1, 'fru':2, 'hap':3, 'neu':4, 'sad':5}
+    #class_map = {'ang':0, 'exc':1, 'fru':2, 'hap':3, 'neu':4, 'sad':5}
+    class_map = {'ang':0, 'exc':1, 'neu':2, 'sad':3}
     counter = {}
     small_data = []
     for instance in data:
@@ -123,16 +127,23 @@ def recategorize_and_split(json_path):
             instance['category_index'] = class_map[cat]
             small_data.append(instance)
 
-    train_size = int(len(small_data) * 0.9)
+    #train_size = int(len(small_data) * 0.9)
+    train_size = int(len(small_data) * 0.8)
     #train_size = 20
     print("statistics:")
     print(counter)
     print("new train size: ", train_size)
 
+    '''
     with open('../data/train.json', 'w+') as f:
         json.dump(small_data[:train_size], f, indent=4)
     with open('../data/val.json', 'w+') as f:
         json.dump(small_data[train_size:], f, indent=4)
+    '''
+    with open('../data/train.pkl', 'wb') as f:
+        pickle.dump(small_data[:train_size], f)
+    with open('../data/val.pkl', 'wb') as f:
+        pickle.dump(small_data[train_size:], f)
     
     return len(class_map)
 
@@ -156,10 +167,27 @@ if __name__ == "__main__":
     for k, v in exp_dict.items():
         exp_dict[k]['id'] = k
         exp_dict[k]['tokens_id'] = list(map(vocab, exp_dict[k]['text_tokens']))
+        # librosa
+        y, sr = librosa.load(exp_dict[k]['wav_path'], sr=11025)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40).T
+        chroma = librosa.feature.chroma_cqt(y=y, sr=sr, n_chroma=12).T
+        rmse = librosa.feature.rmse(y).T
+        zero_crossing = librosa.feature.zero_crossing_rate(y).T
+        # pyAudioAnalysis
+        [Fs, y] = audioBasicIO.readAudioFile(exp_dict[k]['wav_path'])
+        #all_feats, f_names = audioFeatureExtraction.stFeatureExtraction(y, Fs, int(0.025*Fs), int(0.010*Fs))
+        all_feats, f_names = audioFeatureExtraction.stFeatureExtraction(y, Fs, 2048, 512)
+        exp_dict[k]['mfcc'] = mfcc
+        exp_dict[k]['chroma'] = chroma
+        exp_dict[k]['rmse'] = rmse
+        exp_dict[k]['zero_crossing'] = zero_crossing
+        exp_dict[k]['audio'] = all_feats.T
         exps.append(exp_dict[k])
 
-    with open('../data/data.json', 'w') as f:
-        json.dump(exps, f, indent=4)
+    #with open('../data/data.json', 'w') as f:
+    #    json.dump(exps, f, indent=4)
+    with open('../data/data.pkl', 'wb') as f:
+        pickle.dump(exps, f)
 
     #recategorize_and_split('../data/data.json')
 
