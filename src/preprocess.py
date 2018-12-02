@@ -108,8 +108,8 @@ def get_wav_feature(file_dir, wav_dict):
 def recategorize_and_split(json_path):
     with open(json_path, 'r') as f:
         data = json.load(f)
-
-    class_map = {'ang':0, 'exc':1, 'fru':2, 'hap':3, 'neu':4, 'sad':5}
+    class_map = {'ang': 0, 'hap': 1, 'sad': 2, 'neu': 3, 'fru': 4, 'exc': 1, 'fea': 4, 'sur': 4, 'dis': 4, 'oth': 4, 'xxx': 4}
+    class_count = [0,0,0,0,0]
     counter = {}
     small_data = []
     for instance in data:
@@ -122,19 +122,20 @@ def recategorize_and_split(json_path):
         if cat in class_map:
             instance['category_index'] = class_map[cat]
             small_data.append(instance)
+            class_count[class_map[cat]] += 1
 
     train_size = int(len(small_data) * 0.9)
     #train_size = 20
     print("statistics:")
     print(counter)
     print("new train size: ", train_size)
+    weight = 1 / np.asarray(class_count)
+    print(weight / np.sum(weight))
 
-    with open('../data/train.json', 'w+') as f:
-        json.dump(small_data[:train_size], f, indent=4)
     with open('../data/val.json', 'w+') as f:
         json.dump(small_data[train_size:], f, indent=4)
     
-    return len(class_map)
+    return 5
 
 
 if __name__ == "__main__":
@@ -143,9 +144,9 @@ if __name__ == "__main__":
     exp_dict = {}
     SESS_N = 5
     for i in range(1, SESS_N+1):
-        get_labels('../data/IEMOCAP_full_release/Session{}/dialog/EmoEvaluation'.format(i), exp_dict)
-        get_wav_feature('../data/IEMOCAP_full_release/Session{}/sentences/wav'.format(i), exp_dict)
-        get_text('../data/IEMOCAP_full_release/Session{}/dialog/transcriptions'.format(i), exp_dict, w_counter)
+        get_labels('../data/IEMOCAP_full_release_light/Session{}/dialog/EmoEvaluation'.format(i), exp_dict)
+        get_wav_feature('../data/IEMOCAP_full_release_light/Session{}/sentences/wav'.format(i), exp_dict)
+        get_text('../data/IEMOCAP_full_release_light/Session{}/dialog/transcriptions'.format(i), exp_dict, w_counter)
     print("Build Vocabulary...")
     vocab.build(w_counter)
     print("%d words in total" % len(vocab))
@@ -161,11 +162,12 @@ if __name__ == "__main__":
     with open('../data/data.json', 'w') as f:
         json.dump(exps, f, indent=4)
 
-    #recategorize_and_split('../data/data.json')
-
+    recategorize_and_split('../data/data.json')
+    '''
     with open('../data/vocab.pkl','wb') as f:
         pickle.dump(vocab, f)
     load_embedding(vocab, '../data/glove.6B.50d.txt', 50)
     load_embedding(vocab, '../data/glove.6B.100d.txt', 100)
     load_embedding(vocab, '../data/glove.6B.200d.txt', 200)
     load_embedding(vocab, '../data/glove.6B.300d.txt', 300)
+    '''

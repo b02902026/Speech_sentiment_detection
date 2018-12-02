@@ -14,11 +14,11 @@ CUDA = th.cuda.is_available()
 
 
 def training(trainloader, valloader, class_num, device):
-    
-    loss_fn = nn.CrossEntropyLoss()
+    weight = th.FloatTensor([0.28, 0.19, 0.28, 0.18, 0.07]).to(device) 
+    loss_fn = nn.CrossEntropyLoss(weight=weight)
     model = SER(h_size=200, feat_size=40, class_num=class_num)
     model.to(device)
-    optim = Adam(model.parameters(), lr = 1e-4)
+    optim = Adam(model.parameters(), lr = 5e-4)
     epoch = 100
     for e in range(epoch):
         total_loss = 0
@@ -138,16 +138,18 @@ def ter_evaluation(model, loader, device):
     model.train()
     
 
-def validation(model, valloader, loss_fn):
+def validation(model, valloader, loss_fn, device):
     model.eval()
     total_loss = 0
-    for i, (feat, length, labels, _) in enumerate(valloader):
-        if USE_GPU:
-            feat = feat.cuda()
-            labels = labels.cuda()
+    for i, (feat, length, labels, _, _) in enumerate(valloader):
+        feat = feat.to(device)
+        labels = labels.to(device)
         pred = model(feat, length) 
+        th.cuda.empty_cache()
         loss = loss_fn(pred, labels)
         total_loss += loss.data.item()
+
+    model.train()
 
 def ter_validation(model, valloader, loss_fn, device):
     with th.no_grad():
@@ -177,8 +179,9 @@ def main(args):
     if args.feat == "speech":
         training(trainloader, valloader, class_num, device)
     elif args.feat == "text":
-        with open('../data/glove.6B.%dd-relativized.pkl' % args.embs_size, 'rb') as f:
-            pretrain_embs = pickle.load(f)
+        if args.pretrain_embs:
+            with open('../data/glove.6B.%dd-relativized.pkl' % args.embs_size, 'rb') as f:
+                pretrain_embs = pickle.load(f)
         with open('../data/vocab.pkl', 'rb') as f:
             vocab = pickle.load(f)
         if args.model == 'TER_FFNN':
@@ -199,8 +202,8 @@ def main(args):
                             'emb_size': args.embs_size,
                             'ninp': args.embs_size,
                             'nhid': 200,
-                            'nlayers': 1,
-                            'dropout': 0.,
+                            'nlayers': 2,
+                            'dropout': 0.2,
                             'bidirection': True,
                             'nout': class_num,
                             'fc_nhid': 200,
