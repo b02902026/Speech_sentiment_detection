@@ -66,31 +66,25 @@ class IEMOCAP(Dataset):
         zero_crossing = librosa.feature.zero_crossing_rate(y).T
         speech_feats = np.concatenate([mfcc, chroma, rmse, zero_crossing], axis=-1)
         '''
-        ''' 
         speech_feats = np.concatenate([self.data[index]['mfcc'],
                                        self.data[index]['chroma'],
                                        self.data[index]['rmse'],
                                        self.data[index]['zero_crossing']
                                        ], axis=-1)
-        '''
         #speech_feats = self.data[index]['mfcc']
-        speech_feats = self.data[index]['audio']
-                       
         label = self.data[index]['category_index']
-        #if "text" in self.data[index]:
-        #    text = self.data[index]['text']
-        #else:
-        #    text = ""
         tokens_id = self.data[index]['tokens_id']
-        #return mfcc, label, tokens_id
-        return speech_feats, label, tokens_id
+        breath = self.data[index]['breath']
+
+
+        return speech_feats, label, tokens_id, breath
     
     def __len__(self):
         return len(self.data)
 
     def collate_fn(self, b):
         b = sorted(b, key=lambda x:x[0].shape[0], reverse=True)
-        speech_feats, label, tokens_id = map(list,zip(*b))
+        speech_feats, label, tokens_id, breath = map(list,zip(*b))
         # speech feats padding
         speech_length = [x.shape[0] for x in speech_feats]
         speech_max_len = speech_length[0]
@@ -101,10 +95,15 @@ class IEMOCAP(Dataset):
         tok_max_len = max(tok_length)
         for i, token_id in enumerate(tokens_id):
             tokens_id[i] += [0]*(tok_max_len - len(token_id))
+        # breath wave padding
+        breath_length = [len(x) for x in breath]
+        max_bl = max(breath_length)
+        breath = [s + [0 for _ in range(max_bl-len(s))] for s in breath]
         
-        return th.FloatTensor(speech_feats), speech_length, th.LongTensor(label), th.LongTensor(tokens_id), tok_length
+        return th.FloatTensor(speech_feats), speech_length, th.LongTensor(label), th.LongTensor(tokens_id), tok_length, \
+                th.FloatTensor(breath), breath_length
 
-def get_dataloader(path, batch_size, shuffle):
+def get_breath_dataloader(path, batch_size, shuffle):
     IEMO = IEMOCAP(path)
     return DataLoader(IEMO, batch_size=batch_size, shuffle=shuffle, collate_fn=IEMO.collate_fn)
     

@@ -3,9 +3,11 @@ import os
 import json
 import pickle
 import librosa
+from pyAudioAnalysis import audioFeatureExtraction, audioBasicIO
 import collections
 import spacy
 import numpy as np
+from pydub import AudioSegment
 
 PREFIX = '../data'
 nlp = spacy.blank('en')
@@ -104,13 +106,42 @@ def get_wav_feature(file_dir, wav_dict):
             else:
                 print("{} fail".format(file_path))
 
+def get_gathered_breath(file_dir, data_dict):
+    # get breath 
+    for filename in os.listdir(file_dir):
+        with open(os.path.join(file_dir,filename)) as f:
+            lines = f.readlines()[7:-5]
+        
+        name = filename.split('.')[0]
+        # can change the granularity of time
+        breath_wave = []
+        interval_size = 1
+        for i, l in enumerate(lines):
+            time, value = l.strip().split(',')
+            if i % interval_size == 0:
+                breath_wave.append(int(value))
+
+        data_dict[name]['breath'] = breath_wave
+
+def get_gathered_wav(file_dir, data_dict):
+    # get self-recoreded wav file name
+    for filename in os.listdir(file_dir):
+        name = filename.split('.')[0]
+        mysound = AudioSegment.from_wav(os.path.join(file_dir, filename))
+        mysound = mysound.set_channels(1)
+        mysound.export(os.path.join(file_dir, name+ '_mono.wav'), format="wav")
+        data_dict[name]['wav_path'] = os.path.join(file_dir, name+ '_mono.wav')
+
 
 def recategorize_and_split(json_path):
-    with open(json_path, 'r') as f:
-        data = json.load(f)
     class_map = {'ang': 0, 'hap': 1, 'sad': 2, 'neu': 3, 'fru': 4, 'exc': 1, 'fea': 4, 'sur': 4, 'dis': 4, 'oth': 4, 'xxx': 4}
-    class_count = [0,0,0,0,0]
+    with open(json_path, 'rb') as f:
+        data = pickle.load(f)
+
     counter = {}
+    #class_map = {'ang':0, 'exc':1, 'sur':1, 'fru':2, 'hap':3, 'sad':2}
+    class_num = max(class_map.values()) + 1
+    class_count = [0 for _ in range(class_num)]
     small_data = []
     for instance in data:
         cat = instance['category']
@@ -124,21 +155,27 @@ def recategorize_and_split(json_path):
             small_data.append(instance)
             class_count[class_map[cat]] += 1
 
-    train_size = int(len(small_data) * 0.9)
-    #train_size = 20
+    train_size = int(len(small_data) * 0.8)
     print("statistics:")
     print(counter)
     print("new train size: ", train_size)
     weight = 1 / np.asarray(class_count)
     print(weight / np.sum(weight))
 
-    with open('../data/val.json', 'w+') as f:
-        json.dump(small_data[train_size:], f, indent=4)
+    with open('../data/train.pkl', 'wb') as f:
+        pickle.dump(small_data[:train_size], f)
+    with open('../data/val.pkl', 'wb') as f:
+        pickle.dump(small_data[train_size:], f)
     
-    return 5
+    return class_num
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--breath', action='store_true', default=False)
+    parser.add_argument('--gather_path', type=str, default="../data/IEMOCAP_gather")
+    args = parser.parse_args()
+    # Do the breath experiment
     w_counter = collections.Counter()
     vocab = Vocabulary()
     exp_dict = {}
@@ -147,6 +184,19 @@ if __name__ == "__main__":
         get_labels('../data/IEMOCAP_full_release_light/Session{}/dialog/EmoEvaluation'.format(i), exp_dict)
         get_wav_feature('../data/IEMOCAP_full_release_light/Session{}/sentences/wav'.format(i), exp_dict)
         get_text('../data/IEMOCAP_full_release_light/Session{}/dialog/transcriptions'.format(i), exp_dict, w_counter)
+    
+    # filter
+    if args.breath:
+        get_gathered_breath(os.path.join(args.gather_path, 'breath'), exp_dict)
+        get_gathered_wav(os.path.join(args.gather_path, 'wav'), exp_dict)
+        subset_dict = {}
+        for k, v in exp_dict.items():
+            if 'breath' in v:
+                subset_dict[k] = v
+
+        exp_dict = subset_dict
+        print("breath training size is ", len(exp_dict))
+
     print("Build Vocabulary...")
     vocab.build(w_counter)
     print("%d words in total" % len(vocab))
@@ -157,12 +207,29 @@ if __name__ == "__main__":
     for k, v in exp_dict.items():
         exp_dict[k]['id'] = k
         exp_dict[k]['tokens_id'] = list(map(vocab, exp_dict[k]['text_tokens']))
+        # librosa
+        y, sr = librosa.load(exp_dict[k]['wav_path'], sr=11025)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40).T
+        chroma = librosa.feature.chroma_cqt(y=y, sr=sr, n_chroma=12).T
+        rmse = librosa.feature.rmse(y).T
+        zero_crossing = librosa.feature.zero_crossing_rate(y).T
+        # pyAudioAnalysis
+        [Fs, y] = audioBasicIO.readAudioFile(exp_dict[k]['wav_path'])
+        #all_feats, f_names = audioFeatureExtraction.stFeatureExtraction(y, Fs, int(0.025*Fs), int(0.010*Fs))
+        all_feats, f_names = audioFeatureExtraction.stFeatureExtraction(y, Fs, 2048, 512)
+        exp_dict[k]['mfcc'] = mfcc
+        exp_dict[k]['chroma'] = chroma
+        exp_dict[k]['rmse'] = rmse
+        exp_dict[k]['zero_crossing'] = zero_crossing
+        exp_dict[k]['audio'] = all_feats.T
         exps.append(exp_dict[k])
 
-    with open('../data/data.json', 'w') as f:
-        json.dump(exps, f, indent=4)
+    #with open('../data/data.json', 'w') as f:
+    #    json.dump(exps, f, indent=4)
+    with open('../data/data.pkl', 'wb') as f:
+        pickle.dump(exps, f)
 
-    recategorize_and_split('../data/data.json')
+    #recategorize_and_split('../data/data.json')
     '''
     with open('../data/vocab.pkl','wb') as f:
         pickle.dump(vocab, f)
