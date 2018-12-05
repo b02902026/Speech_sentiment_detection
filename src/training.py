@@ -116,7 +116,7 @@ def training(model ,trainloader, valloader, class_num, device, args):
 
     loss_fn = nn.CrossEntropyLoss(weight=weight)
     #model = SER(h_size=200, feat_size=40, class_num=class_num)
-    model.to(device)
+    #model.to(device)
     
     optim = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
     epoch = 100
@@ -131,8 +131,9 @@ def training(model ,trainloader, valloader, class_num, device, args):
             optim.zero_grad()
             feat = feat.to(device)
             labels = labels.to(device)
+            tokens_id = tokens_id.to(device)
             th.cuda.empty_cache()
-            pred = model(feat, length, tokens_id, tok_length) 
+            pred = model(feat, length, tokens_id, tok_length)
             loss = loss_fn(pred, labels)
             loss.backward()
             optim.step()
@@ -158,40 +159,6 @@ def training(model ,trainloader, valloader, class_num, device, args):
     
     return best_model
 
-
-def ter_training(model, model_kwargs, trainloader, valloader, class_num, device):
-    model_map = {'TER_RNN': TER_RNN,
-                 'TER_FFNN': TER_FFNN}
-   
-    loss_fn = nn.CrossEntropyLoss()
-    model = model_map[model](**model_kwargs)
-    model.to(device)
-    optim = Adam(model.parameters(), lr = 1e-4)
-    epoch = 100
-    for e in range(epoch):
-        total_loss = 0
-        start_time = time.time()
-        for i, (_, _, labels, tokens_id, tok_length) in enumerate(trainloader):
-            optim.zero_grad()
-            tokens_id = tokens_id.to(device)
-            th.cuda.empty_cache()
-            pred = model(feat, length, tokens_id, tok_length)
-            loss = loss_fn(pred, labels)
-            loss.backward()
-            optim.step()
-            total_loss += loss.data.item()
-            if (i+1) % 100 == 0:
-                print("epoch:{}/{}, batch:{}/{}, loss:{}".format(e, epoch, i, len(trainloader), total_loss / (i+1)))
-        
-        validation(model, valloader, loss_fn, device)
-        acc = evaluation(model, valloader, device)
-        if acc > max_acc:
-            max_acc = acc
-        print('max acc: {}'.format(max_acc))
-        print("epoch {} finished, elapsed time {} sec".format(e, time.time()-start_time))
-        print()
-    
-    return model
 
 def evaluation(model, loader, device):
     with th.no_grad():
@@ -221,39 +188,6 @@ def validation(model, valloader, loss_fn, device):
         for i, (feat, length, labels, tokens_id, tok_length) in enumerate(valloader):
             feat = feat.to(device)
             labels = labels.to(device)
-            th.cuda.empty_cache()
-            pred = model(feat, length, tokens_id, tok_length) 
-            loss = loss_fn(pred, labels)
-            total_loss += loss.data.item()
-
-    print("validation loss:{}".format(total_loss / len(valloader)))
-    model.train()
-
-def ter_evaluation(model, loader, device):
-    with th.no_grad():
-        model.eval()
-        total = 0
-        correct = 0
-        for i, (_, _, labels, tokens_id, tok_length) in enumerate(loader):
-            B = tokens_id.size(0)
-            tokens_id = tokens_id.to(device)
-            labels = labels.to(device)
-            th.cuda.empty_cache()
-            pred = model(tokens_id, tok_length) 
-            _, c = pred.max(dim=1)
-            correct += th.sum(c == labels).item()
-            total += B
-    
-    print("acc:{}".format(correct / total))
-    model.train()
-    
-
-
-def ter_validation(model, valloader, loss_fn, device):
-    with th.no_grad():
-        model.eval()
-        total_loss = 0
-        for i, (_, _, labels, tokens_id, tok_length) in enumerate(valloader):
             tokens_id = tokens_id.to(device)
             th.cuda.empty_cache()
             pred = model(feat, length, tokens_id, tok_length)
@@ -327,7 +261,7 @@ def main(args):
             pretrain_embs = pickle.load(f)
         with open('../data/vocab.pkl', 'rb') as f:
             vocab = pickle.load(f)
-        model_kwargs = {'speech_feat_size': 40,
+        model_kwargs = {'speech_feat_size': args.feat_size,
                         'cell_type': 'GRU',
                         'ntoken': len(vocab),
                         'emb_size': args.embs_size,
