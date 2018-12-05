@@ -4,7 +4,7 @@ from torch.nn import functional as F
 from torch.optim import Adam, SGD
 from dataloader import *
 from breath_dataloader import *
-from simple_model import SER, SER_CNN
+from simple_model import SER, SER_CNN, SER_RNN_Encoder
 from text_model import TER_FFNN, TER_RNN
 from mix_model import MixER
 from breath_model import BreathClassifier
@@ -108,17 +108,14 @@ def breath_validation(model, valloader, loss_fn, device):
 
 def training(model ,trainloader, valloader, class_num, device, args):
     if args.weighted:
-        weight = th.FloatTensor([0.28, 0.19, 0.28, 0.18, 0.07]).to(device) 
+        w = th.FloatTensor([0.28, 0.19, 0.28, 0.18, 0.07]).to(device) 
+        loss_fn = nn.CrossEntropyLoss(weight=w)
         print('weighted')
     else:
-        weight = None
+        loss_fn = nn.CrossEntropyLoss()
         print('unweighted')
 
-    loss_fn = nn.CrossEntropyLoss(weight=weight)
-    #model = SER(h_size=200, feat_size=40, class_num=class_num)
-    #model.to(device)
-    
-    optim = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
+    optim = Adam(model.parameters(), lr=5e-4)
     epoch = 100
     max_acc = 0
     patience = 25
@@ -205,11 +202,13 @@ def main(args):
     else:
         device = th.device("cpu")
         print("CUDA Disabled")
+
     class_num = recategorize_and_split(args.data_path)
-    trainloader = get_dataloader(args.train_path, batch_size=16, shuffle=True)
-    valloader = get_dataloader(args.val_path, batch_size=2, shuffle=False)
+    trainloader = get_dataloader(args.train_path, batch_size=16, shuffle=True, feat_size=args.feat_size)
+    valloader = get_dataloader(args.val_path, batch_size=2, shuffle=False, feat_size=args.feat_size)
     if args.feat == "speech":
         model = SER(h_size=200, feat_size=args.feat_size, class_num=class_num, dropout=0.)
+        #model = SER_RNN_Encoder(h_size=200, feat_size=args.feat_size, dropout=0.)
         #model = SER_CNN(conv_type='2d', h_size=100, feat_size=40, class_num=class_num, max_time_step=trainloader.dataset.max_time_step, nlayers=2, kernel=[3], dropout=0.5)
         model.to(device)
     elif args.feat == "breath":
