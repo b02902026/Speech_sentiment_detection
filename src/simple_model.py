@@ -16,6 +16,7 @@ class SER_RNN_Encoder(nn.Module):
         self.dropout = nn.Dropout(dropout) if dropout > 0 else None
         ## attributes
         self.nout = 2 * h_size
+        self.fc = nn.Linear(self.hidden_size*2, 5)
 
     def forward(self, x, lengths):
         B = x.size(0)
@@ -26,7 +27,7 @@ class SER_RNN_Encoder(nn.Module):
         if self.dropout:
             h = self.dropout(h)
         out = h.permute(1,0,2).contiguous().view(B,-1)
-        
+
         return out
 
 
@@ -39,8 +40,6 @@ class SER(ERBase_):
         outs = self.ser_rnn_encoder(speech_inputs, speech_lengths)
         outs = self.fcn(outs)
         return outs
-
-
 
 
 ### SER CNN Model ###

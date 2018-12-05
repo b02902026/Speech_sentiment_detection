@@ -21,9 +21,10 @@ def get_mean_var(all_data):
 
 
 class IEMOCAP(Dataset):
-    def __init__(self, data_path):
+    def __init__(self, data_path, feat_size):
         #with open(data_path, 'r') as f:
         #    self.data = json.load(f)
+        self.feat_size = feat_size
         with open(data_path, 'rb') as f:
             self.data = pickle.load(f)
 
@@ -43,13 +44,14 @@ class IEMOCAP(Dataset):
         mean_rmse, std_rmse = get_mean_var(all_rmse)
         mean_zero_crossing, std_zero_crossing = get_mean_var(all_zero_crossing)
         mean_audio, std_audio = get_mean_var(all_audio)
+        '''
         for d in self.data:
             d['mfcc'] = (d['mfcc'] - mean_mfcc) / std_mfcc
             d['chroma'] = (d['chroma'] - mean_chroma) / std_chroma
             d['rmse'] = (d['rmse'] - mean_rmse) / std_rmse
             d['zero_crossing'] = (d['zero_crossing'] - mean_zero_crossing) / std_zero_crossing
             d['audio'] = (d['audio'] - mean_audio) / std_audio
-
+        '''
         # TODO: may need to modify
         #self.max_time_step = 736
         #self.max_au_time_step = 1063
@@ -66,15 +68,16 @@ class IEMOCAP(Dataset):
         zero_crossing = librosa.feature.zero_crossing_rate(y).T
         speech_feats = np.concatenate([mfcc, chroma, rmse, zero_crossing], axis=-1)
         '''
-        ''' 
-        speech_feats = np.concatenate([self.data[index]['mfcc'],
-                                       self.data[index]['chroma'],
-                                       self.data[index]['rmse'],
-                                       self.data[index]['zero_crossing']
-                                       ], axis=-1)
-        '''
-        #speech_feats = self.data[index]['mfcc']
-        speech_feats = self.data[index]['audio']
+        if self.feat_size == 54:
+            speech_feats = np.concatenate([self.data[index]['mfcc'],
+                                           self.data[index]['chroma'],
+                                           self.data[index]['rmse'],
+                                           self.data[index]['zero_crossing']
+                                           ], axis=-1)
+        elif self.feat_size == 40:
+            speech_feats = self.data[index]['mfcc']
+        elif self.feat_size == 34:
+            speech_feats = self.data[index]['audio']
                        
         label = self.data[index]['category_index']
         #if "text" in self.data[index]:
@@ -104,8 +107,8 @@ class IEMOCAP(Dataset):
         
         return th.FloatTensor(speech_feats), speech_length, th.LongTensor(label), th.LongTensor(tokens_id), tok_length
 
-def get_dataloader(path, batch_size, shuffle):
-    IEMO = IEMOCAP(path)
+def get_dataloader(path, batch_size, shuffle, feat_size):
+    IEMO = IEMOCAP(path, feat_size)
     return DataLoader(IEMO, batch_size=batch_size, shuffle=shuffle, collate_fn=IEMO.collate_fn)
     
 
