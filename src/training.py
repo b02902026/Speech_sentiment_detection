@@ -182,7 +182,7 @@ def evaluation(model, loader, device):
                 class_total_count[tclass] += 1
             
     
-    print("averqge acc:{:.3f}".format(correct / total))
+    print("average acc:{:.3f}".format(correct / total))
     for nc in range(len(idx2emo)):
         print("class: {}, accuracy:{:.3f}".format(idx2emo[nc], class_correct_count[nc] / class_total_count[nc]))
     model.train()
@@ -214,12 +214,21 @@ def main(args):
         device = th.device("cpu")
         print("CUDA Disabled")
 
+    print("Feat: %s" % args.feat)
     class_num = recategorize_and_split(args.data_path)
-    trainloader = get_dataloader(args.train_path, batch_size=16, shuffle=True, feat_size=args.feat_size)
-    valloader = get_dataloader(args.val_path, batch_size=2, shuffle=False, feat_size=args.feat_size)
+    if args.speech_model == 'SER':
+        pad_type = 'batch'
+    elif args.speech_model[:-2] == 'SER_CNN':
+        pad_type = 'global'
+    trainloader = get_dataloader(args.train_path, batch_size=16, shuffle=True, feat_size=args.feat_size, pad_type=pad_type)
+    valloader = get_dataloader(args.val_path, batch_size=2, shuffle=False, feat_size=args.feat_size, pad_type=pad_type)
     if args.feat == "speech":
-        model = SER(h_size=200, feat_size=args.feat_size, class_num=class_num, dropout=0.)
-        #model = SER_CNN(conv_type='1d', h_size=100, feat_size=args.feat_size, class_num=class_num, max_time_step=trainloader.dataset.max_time_step, nlayers=2, kernel=[3], dropout=0.3)
+        print("Model: %s" % args.speech_model)
+        if args.speech_model == 'SER':
+            model = SER(h_size=200, feat_size=args.feat_size, class_num=class_num, dropout=0.)
+        elif args.speech_model in ['SER_CNN1d', 'SER_CNN2d']:
+            conv_type = args.speech_model[-2:]
+            model = SER_CNN(conv_type=conv_type, h_size=100, feat_size=args.feat_size, class_num=class_num, max_time_step=trainloader.dataset.max_time_step, nlayers=2, kernel=[3], dropout=0.3)
         model.to(device)
     elif args.feat == "breath":
         class_num = recategorize_and_split(args.data_path)
@@ -235,6 +244,7 @@ def main(args):
                 pretrain_embs = pickle.load(f)
         with open('../data/vocab.pkl', 'rb') as f:
             vocab = pickle.load(f)
+        print("Model: %s" % args.model)
         if args.model == 'TER_FFNN':
             model_kwargs = {'ntoken': len(vocab),
                             'emb_size': args.embs_size,
@@ -298,6 +308,7 @@ if __name__ == "__main__":
     parser.add_argument('-val_path', type=str, default="../data/val.pkl")
     parser.add_argument('-feat', type=str, default="speech", choices=['speech', 'text', 'mix', 'breath'])
     parser.add_argument('-model', type=str, default="TER_RNN", choices=['TER_RNN', 'TER_FFNN'])
+    parser.add_argument('-speech_model', type=str, default="SER", choices=['SER', 'SER_CNN1d', 'SER_CNN2d'])
     parser.add_argument('-embs_size', type=int, default=100, choices=[50, 100, 200, 30])
     parser.add_argument('-feat_size', type=int, default=40, help='the size of acoustic feature')
     parser.add_argument('-pretrain_embs', action='store_true', default=False, help='whether to use pretrain embeddings')

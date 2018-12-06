@@ -105,7 +105,10 @@ class SER_CNN_Encoder(nn.Module):
         group = self.get_layer_arg(kernel, group)
         # cnn layers
         self.cnn_layers = []
-        in_out = [1, nfilter]
+        if conv_type == '2d':
+            in_out = [1, nfilter]
+        elif conv_type == '1d':
+            in_out = [feat_size, nfilter]
         for i in range(nlayers):
             conv = ExtendConv(conv_type, *in_out, kernel, stride, dilation, group)
             self.cnn_layers.append(conv)
@@ -117,9 +120,9 @@ class SER_CNN_Encoder(nn.Module):
         self.dropout = nn.Dropout(dropout) if dropout > 0 else None
         ## attributs ##
         if conv_type == '2d':
-            nout = feat_size // (2**nlayers) * max_time_step // (2**nlayers) * nfilter
+            nout = (feat_size // (2**nlayers)) * (max_time_step // (2**nlayers)) * nfilter
         elif conv_type == '1d':
-            nout = max_time_step // (2**nlayers) * nfilter
+            nout = (max_time_step // (2**nlayers)) * nfilter
         self.nout = nout
         self.conv_type = conv_type
         ## init ##
@@ -159,7 +162,7 @@ class SER_CNN_Encoder(nn.Module):
             outs = inputs.unsqueeze(1) # shape: [B, 1, T, ninp]
             pool_func = F.max_pool2d
         elif self.conv_type == '1d':
-            outs = inputs.permute(0, 2, 1)
+            outs = inputs.permute(0, 2, 1) # shape: [B, ninp, T]
             pool_func = F.max_pool1d
         for i in range(len(self.cnn_layers)):
             outs = self.nonlinear(self.cnn_layers[i](outs))
@@ -193,7 +196,7 @@ class SER_CNN(ERBase_):
                                           dilation,
                                           group,
                                           dropout)
-        super(SER, self).__init__(ser_cnn_encoder.nout, h_size, class_num, fc_nlayers=1, fc_dropout=dropout)
+        super(SER_CNN, self).__init__(ser_cnn_encoder.nout, h_size, class_num, fc_nlayers=1, fc_dropout=dropout)
         self.ser_cnn_encoder = ser_cnn_encoder
 
     def forward(self, speech_inputs, speech_lengths, token_ids, tok_lengths):
