@@ -28,7 +28,7 @@ def breath_training(trainloader, valloader, class_num, device):
     epoch = 100
     max_acc = 0.
     max_valloss = float('Inf')
-    patience = 30
+    patience = 40
     k = patience
     best_model = None
 
@@ -153,15 +153,19 @@ def training(model ,trainloader, valloader, class_num, device, args):
     print("{}Early Stopping{}".format('-'*30, '-'*30))
     validation(best_model, valloader, loss_fn, device)
     evaluation(best_model, valloader, device)
-    
+    th.save(best_model.state_dict(), 'checkpoint/model.pt')
+
     return best_model
 
 
 def evaluation(model, loader, device):
+    idx2emo = {0: 'ang', 1: 'hap', 2: 'sad', 3: 'neu'}
     with th.no_grad():
         model.eval()
         total = 0
         correct = 0
+        class_correct_count = [0] * len(idx2emo)
+        class_total_count = [0] * len(idx2emo)
         for i, (feat, length, labels, tokens_id, tok_length) in enumerate(loader):
             B = feat.size(0)
             feat = feat.to(device)
@@ -172,8 +176,15 @@ def evaluation(model, loader, device):
             _, c = pred.max(dim=1)
             correct += th.sum(c == labels).item()
             total += B
+            # get each class acc
+            for pclass, tclass in zip(c,labels):
+                class_correct_count[tclass] += 1 if pclass == tclass else 0
+                class_total_count[tclass] += 1
+            
     
-    print("acc:{}".format(correct / total))
+    print("averqge acc:{:.3f}".format(correct / total))
+    for nc in range(len(idx2emo)):
+        print("class: {}, accuracy:{:.3f}".format(idx2emo[nc], class_correct_count[nc] / class_total_count[nc]))
     model.train()
     return correct / total
     
@@ -208,8 +219,7 @@ def main(args):
     valloader = get_dataloader(args.val_path, batch_size=2, shuffle=False, feat_size=args.feat_size)
     if args.feat == "speech":
         model = SER(h_size=200, feat_size=args.feat_size, class_num=class_num, dropout=0.)
-        #model = SER_RNN_Encoder(h_size=200, feat_size=args.feat_size, dropout=0.)
-        #model = SER_CNN(conv_type='2d', h_size=100, feat_size=40, class_num=class_num, max_time_step=trainloader.dataset.max_time_step, nlayers=2, kernel=[3], dropout=0.5)
+        #model = SER_CNN(conv_type='1d', h_size=100, feat_size=args.feat_size, class_num=class_num, max_time_step=trainloader.dataset.max_time_step, nlayers=2, kernel=[3], dropout=0.3)
         model.to(device)
     elif args.feat == "breath":
         class_num = recategorize_and_split(args.data_path)

@@ -8,6 +8,7 @@ import collections
 import spacy
 import numpy as np
 from pydub import AudioSegment
+import random
 
 PREFIX = '../data'
 nlp = spacy.blank('en')
@@ -134,7 +135,8 @@ def get_gathered_wav(file_dir, data_dict):
 
 
 def recategorize_and_split(json_path):
-    class_map = {'ang': 0, 'hap': 1, 'sad': 2, 'neu': 3, 'fru': 4, 'exc': 1, 'fea': 4, 'sur': 4, 'dis': 4, 'oth': 4, 'xxx': 4}
+    #class_map = {'ang': 0, 'hap': 1, 'sad': 2, 'neu': 3, 'fru': 4, 'exc': 1, 'fea': 4, 'sur': 4, 'dis': 4, 'oth': 4, 'xxx': 4}
+    class_map = {'ang': 0, 'hap': 1, 'sad': 2, 'neu': 3, 'exc': 1}
     with open(json_path, 'rb') as f:
         data = pickle.load(f)
 
@@ -156,6 +158,7 @@ def recategorize_and_split(json_path):
             class_count[class_map[cat]] += 1
 
     train_size = int(len(small_data) * 0.8)
+    random.shuffle(small_data)
     print("statistics:")
     print(counter)
     print("new train size: ", train_size)
@@ -169,11 +172,17 @@ def recategorize_and_split(json_path):
     
     return class_num
 
+def extract_from_wav(wav_file, rate=11025):
+    y, sr = librosa.load(wav_file, sr=rate)
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40).T
+    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--breath', action='store_true', default=False)
     parser.add_argument('--gather_path', type=str, default="../data/IEMOCAP_gather")
+    parser.add_argument('-output', type=str, default="../data/data.pkl")
     args = parser.parse_args()
     # Do the breath experiment
     w_counter = collections.Counter()
@@ -226,7 +235,7 @@ if __name__ == "__main__":
 
     #with open('../data/data.json', 'w') as f:
     #    json.dump(exps, f, indent=4)
-    with open('../data/data.pkl', 'wb') as f:
+    with open(args.output, 'wb') as f:
         pickle.dump(exps, f)
 
     #recategorize_and_split('../data/data.json')

@@ -44,14 +44,14 @@ class IEMOCAP(Dataset):
         mean_rmse, std_rmse = get_mean_var(all_rmse)
         mean_zero_crossing, std_zero_crossing = get_mean_var(all_zero_crossing)
         mean_audio, std_audio = get_mean_var(all_audio)
-        '''
+        
         for d in self.data:
             d['mfcc'] = (d['mfcc'] - mean_mfcc) / std_mfcc
             d['chroma'] = (d['chroma'] - mean_chroma) / std_chroma
             d['rmse'] = (d['rmse'] - mean_rmse) / std_rmse
             d['zero_crossing'] = (d['zero_crossing'] - mean_zero_crossing) / std_zero_crossing
             d['audio'] = (d['audio'] - mean_audio) / std_audio
-        '''
+        
         # TODO: may need to modify
         #self.max_time_step = 736
         #self.max_au_time_step = 1063
