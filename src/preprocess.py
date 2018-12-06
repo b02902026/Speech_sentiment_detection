@@ -144,8 +144,10 @@ def recategorize_and_split(json_path):
     #class_map = {'ang':0, 'exc':1, 'sur':1, 'fru':2, 'hap':3, 'sad':2}
     class_num = max(class_map.values()) + 1
     class_count = [0 for _ in range(class_num)]
-    small_data = []
+    train_data = []
+    val_data = []
     for instance in data:
+        session_id = int(instance['wav_path'].split('/')[-1].split('_')[0][4])
         cat = instance['category']
         if cat not in counter:
             counter[cat] = 1
@@ -154,11 +156,14 @@ def recategorize_and_split(json_path):
 
         if cat in class_map:
             instance['category_index'] = class_map[cat]
-            small_data.append(instance)
+            if session_id == 5:
+                val_data.append(instance)
+            else:
+                small_data.append(instance)
             class_count[class_map[cat]] += 1
 
-    train_size = int(len(small_data) * 0.8)
-    random.shuffle(small_data)
+    #train_size = int(len(small_data) * 0.8)
+    #random.shuffle(small_data)
     print("statistics:")
     print(counter)
     print("new train size: ", train_size)
@@ -166,9 +171,9 @@ def recategorize_and_split(json_path):
     print(weight / np.sum(weight))
 
     with open('../data/train.pkl', 'wb') as f:
-        pickle.dump(small_data[:train_size], f)
+        pickle.dump(train_data, f)
     with open('../data/val.pkl', 'wb') as f:
-        pickle.dump(small_data[train_size:], f)
+        pickle.dump(val_data, f)
     
     return class_num
 
@@ -183,6 +188,8 @@ if __name__ == "__main__":
     parser.add_argument('--breath', action='store_true', default=False)
     parser.add_argument('--gather_path', type=str, default="../data/IEMOCAP_gather")
     parser.add_argument('-output', type=str, default="../data/data.pkl")
+    parser.add_argument('--raw', action='store_true', default=False)
+    parser.add_argument('-sr', type=int, default=11025)
     args = parser.parse_args()
     # Do the breath experiment
     w_counter = collections.Counter()
@@ -205,6 +212,8 @@ if __name__ == "__main__":
 
         exp_dict = subset_dict
         print("breath training size is ", len(exp_dict))
+    
+    exit()
 
     print("Build Vocabulary...")
     vocab.build(w_counter)
@@ -217,7 +226,13 @@ if __name__ == "__main__":
         exp_dict[k]['id'] = k
         exp_dict[k]['tokens_id'] = list(map(vocab, exp_dict[k]['text_tokens']))
         # librosa
-        y, sr = librosa.load(exp_dict[k]['wav_path'], sr=11025)
+        y, sr = librosa.load(exp_dict[k]['wav_path'], sr=args.sr)
+        # use raw
+        if args.raw:
+            window_size = 100
+            exp_dict[k]['raw'] 
+
+        # features from librosa
         mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40).T
         chroma = librosa.feature.chroma_cqt(y=y, sr=sr, n_chroma=12).T
         rmse = librosa.feature.rmse(y).T

@@ -193,7 +193,7 @@ class SER_CNN(ERBase_):
                                           dilation,
                                           group,
                                           dropout)
-        super(SER, self).__init__(ser_cnn_encoder.nout, h_size, class_num, fc_nlayers=1, fc_dropout=dropout)
+        super(SER_CNN, self).__init__(ser_cnn_encoder.nout, h_size, class_num, fc_nlayers=1, fc_dropout=dropout)
         self.ser_cnn_encoder = ser_cnn_encoder
 
     def forward(self, speech_inputs, speech_lengths, token_ids, tok_lengths):

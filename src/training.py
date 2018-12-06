@@ -215,11 +215,11 @@ def main(args):
         print("CUDA Disabled")
 
     class_num = recategorize_and_split(args.data_path)
-    trainloader = get_dataloader(args.train_path, batch_size=16, shuffle=True, feat_size=args.feat_size)
-    valloader = get_dataloader(args.val_path, batch_size=2, shuffle=False, feat_size=args.feat_size)
+    trainloader = get_dataloader(args.train_path, batch_size=16, shuffle=True, args=args)
+    valloader = get_dataloader(args.val_path, batch_size=2, shuffle=False, args=args)
     if args.feat == "speech":
-        model = SER(h_size=200, feat_size=args.feat_size, class_num=class_num, dropout=0.)
-        #model = SER_CNN(conv_type='1d', h_size=100, feat_size=args.feat_size, class_num=class_num, max_time_step=trainloader.dataset.max_time_step, nlayers=2, kernel=[3], dropout=0.3)
+        model = SER(h_size=200, feat_size=3, class_num=class_num, dropout=0.)
+        #model = SER_CNN(conv_type='2d', h_size=100, feat_size=args.feat_size, class_num=class_num, max_time_step=trainloader.dataset.max_time_step, nlayers=2, kernel=[3], dropout=0.3)
         model.to(device)
     elif args.feat == "breath":
         class_num = recategorize_and_split(args.data_path)
@@ -290,6 +290,7 @@ def main(args):
         model.to(device)
 
     training(model, trainloader, valloader, class_num, device, args)
+    print(args)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -303,6 +304,7 @@ if __name__ == "__main__":
     parser.add_argument('-pretrain_embs', action='store_true', default=False, help='whether to use pretrain embeddings')
     parser.add_argument('--cuda', type=int, default=0, help='the cuda device to use')
     parser.add_argument('--weighted', action='store_true', default=False, help='the cuda device to use')
+    parser.add_argument('-description', type=str, default='', help='the model config')
     args = parser.parse_args()
     main(args)
 
