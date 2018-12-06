@@ -21,10 +21,12 @@ def get_mean_var(all_data):
 
 
 class IEMOCAP(Dataset):
-    def __init__(self, data_path, args):
+    def __init__(self, data_path, feat_size, pad_type):
         #with open(data_path, 'r') as f:
         #    self.data = json.load(f)
-        self.feat_size = args.feat_size
+        self.feat_size = feat_size
+        self.pad_type = pad_type
+        assert self.pad_type in ['batch', 'global']
         with open(data_path, 'rb') as f:
             self.data = pickle.load(f)
 
@@ -63,7 +65,14 @@ class IEMOCAP(Dataset):
         self.max_time_step = 736
         self.max_au_time_step = 1063
         #self.max_time_step = max([x.shape[0] for x in all_mfcc])
-        #self.max_au_time_step = max([x.shape[0] for x in all_audio])
+        #self.max_time_step = max([x.shape[0] for x in all_audio])
+        '''
+        if self.feat_size in [54, 40]:
+            self.max_time_step = 736
+        elif self.feat_size == 34:
+            self.max_time_step = 1063
+        '''
+        self.max_time_step = 1063
 
     
     def __getitem__(self, index):
@@ -104,7 +113,7 @@ class IEMOCAP(Dataset):
         speech_feats, label, tokens_id = map(list,zip(*b))
         # speech feats padding
         speech_length = [x.shape[0] for x in speech_feats]
-        speech_max_len = speech_length[0]
+        speech_max_len = speech_length[0] if self.pad_type == 'batch' else self.max_time_step
         for i, feat in enumerate(speech_feats):
             speech_feats[i] = np.concatenate((feat, np.zeros((speech_max_len-feat.shape[0], feat.shape[1]))), axis=0)
         # tokens_id padding
@@ -115,8 +124,8 @@ class IEMOCAP(Dataset):
         
         return th.FloatTensor(speech_feats), speech_length, th.LongTensor(label), th.LongTensor(tokens_id), tok_length
 
-def get_dataloader(path, batch_size, shuffle, args):
-    IEMO = IEMOCAP(path, args)
+def get_dataloader(path, batch_size, shuffle, feat_size, pad_type):
+    IEMO = IEMOCAP(path, feat_size, pad_type)
     return DataLoader(IEMO, batch_size=batch_size, shuffle=shuffle, collate_fn=IEMO.collate_fn)
     
 

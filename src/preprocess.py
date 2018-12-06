@@ -254,11 +254,9 @@ if __name__ == "__main__":
         pickle.dump(exps, f)
 
     #recategorize_and_split('../data/data.json')
-    '''
     with open('../data/vocab.pkl','wb') as f:
         pickle.dump(vocab, f)
     load_embedding(vocab, '../data/glove.6B.50d.txt', 50)
     load_embedding(vocab, '../data/glove.6B.100d.txt', 100)
     load_embedding(vocab, '../data/glove.6B.200d.txt', 200)
     load_embedding(vocab, '../data/glove.6B.300d.txt', 300)
-    '''
