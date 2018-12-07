@@ -241,8 +241,8 @@ if __name__ == "__main__":
             frames = []
             window_size = 100
             hop_size = 0
-            for t in range(0, len(y), 200):
-                frames.append(y[t:t+200])
+            for t in range(0, len(y), window_size):
+                frames.append(y[t:t+wondow_size])
 
             exp_dict[k]['raw'] = np.asarray(frames)
             exps.append(exp_dict[k])

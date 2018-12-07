@@ -232,7 +232,7 @@ def main(args):
     valloader = get_dataloader(args.val_path, batch_size=2, shuffle=False, feat_size=args.feat_size, pad_type=pad_type)
     if args.feat == "speech":
         print("Model: %s" % args.speech_model)
-        actual_feat = 21
+        actual_feat = 200
         if args.speech_model == 'SER':
             model = SER(h_size=200, feat_size=actual_feat, class_num=class_num, dropout=0.)
         elif args.speech_model in ['SER_CNN1d', 'SER_CNN2d']:

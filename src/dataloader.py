@@ -41,6 +41,10 @@ class IEMOCAP(Dataset):
         # process raw wav
         if 'raw' in self.data[0]:
             for d in self.data:
+                # pad the las one
+                #print(d['raw'].shape, d['raw'][0].shape,d['raw'][1].shape, d['raw'][-1].shape)
+                d['raw'][-1]  = np.concatenate((d['raw'][-1], np.zeros((200-d['raw'][-1].shape[0]))), axis=None)
+                d['raw'] = np.stack(d['raw']).reshape(-1, 200)
                 all_raw.append(d['raw'])
             mean_raw, std_raw = get_mean_var(all_raw)
             for d in self.data:
@@ -86,7 +90,8 @@ class IEMOCAP(Dataset):
         elif self.feat_size == 34:
             self.max_time_step = 1063
         '''
-        self.max_time_step = 1063
+        #self.max_time_step = 1063
+        self.max_time_step = 1882
         #self.max_time_step = 1471
 
     
