@@ -118,7 +118,7 @@ def training(model ,trainloader, valloader, class_num, device, args):
     optim = Adam(model.parameters(), lr=5e-4)
     epoch = 100
     max_acc = 0
-    patience = 25
+    patience = 20
     k = patience
     best_model = None
     for e in range(epoch):
@@ -160,6 +160,9 @@ def training(model ,trainloader, valloader, class_num, device, args):
 
 def evaluation(model, loader, device):
     idx2emo = {0: 'ang', 1: 'hap', 2: 'sad', 3: 'neu'}
+    weight = [1103, 1636, 1084, 1708]
+    weight = [x / np.sum(weight) for x in weight]
+
     with th.no_grad():
         model.eval()
         total = 0
@@ -182,9 +185,12 @@ def evaluation(model, loader, device):
                 class_total_count[tclass] += 1
             
     
-    print("average acc:{:.3f}".format(correct / total))
+    WA = 0
     for nc in range(len(idx2emo)):
+        WA += (class_correct_count[nc] / class_total_count[nc]) * weight[nc]
         print("class: {}, accuracy:{:.3f}".format(idx2emo[nc], class_correct_count[nc] / class_total_count[nc]))
+    print("unweighted accuracy:{:.3f}".format(correct / total))
+    print("weighted accuracy:{:.3f}".format(WA))
     model.train()
     return correct / total
     
@@ -226,13 +232,15 @@ def main(args):
     valloader = get_dataloader(args.val_path, batch_size=2, shuffle=False, feat_size=args.feat_size, pad_type=pad_type)
     if args.feat == "speech":
         print("Model: %s" % args.speech_model)
+        actual_feat = 21
         if args.speech_model == 'SER':
-            model = SER(h_size=200, feat_size=args.feat_size, class_num=class_num, dropout=0.)
+            model = SER(h_size=200, feat_size=actual_feat, class_num=class_num, dropout=0.)
         elif args.speech_model in ['SER_CNN1d', 'SER_CNN2d']:
             conv_type = args.speech_model[-2:]
-            model = SER_CNN(conv_type=conv_type, h_size=100, feat_size=args.feat_size, class_num=class_num, \ 
+            model = SER_CNN(conv_type=conv_type, h_size=100, feat_size=actual_feat, class_num=class_num, \
                     max_time_step=trainloader.dataset.max_time_step, nlayers=2, kernel=[3], dropout=0.3)
         model.to(device)
+
     # breathing model
     elif args.feat == "breath":
         class_num = recategorize_and_split(args.data_path)
@@ -240,7 +248,6 @@ def main(args):
         valloader = get_breath_dataloader(args.val_path, batch_size=2, shuffle=False)
         breath_training(trainloader, valloader, class_num, device)
         exit()
-
 
     elif args.feat == "text":
         if args.pretrain_embs:

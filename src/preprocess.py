@@ -144,37 +144,47 @@ def recategorize_and_split(json_path):
     #class_map = {'ang':0, 'exc':1, 'sur':1, 'fru':2, 'hap':3, 'sad':2}
     class_num = max(class_map.values()) + 1
     class_count = [0 for _ in range(class_num)]
+    small_data = []
     train_data = []
     val_data = []
     for instance in data:
         session_id = int(instance['wav_path'].split('/')[-1].split('_')[0][4])
         cat = instance['category']
-        if cat not in counter:
+        if cat not in counter and cat in class_map:
             counter[cat] = 1
-        else:
+        elif cat in class_map:
             counter[cat] += 1
 
         if cat in class_map:
             instance['category_index'] = class_map[cat]
+            '''
             if session_id == 5:
                 val_data.append(instance)
             else:
-                small_data.append(instance)
+                train_data.append(instance)
+            '''
+            small_data.append(instance)
             class_count[class_map[cat]] += 1
 
-    #train_size = int(len(small_data) * 0.8)
+    train_size = int(len(small_data) * 0.8)
     #random.shuffle(small_data)
     print("statistics:")
     print(counter)
-    print("new train size: ", train_size)
+    print("original size: ", len(data))
+    print("train size: ", len(train_data))
+    print("val size: ", len(val_data))
     weight = 1 / np.asarray(class_count)
     print(weight / np.sum(weight))
-
+    '''
     with open('../data/train.pkl', 'wb') as f:
         pickle.dump(train_data, f)
     with open('../data/val.pkl', 'wb') as f:
         pickle.dump(val_data, f)
-    
+    '''
+    with open('../data/train.pkl', 'wb') as f:
+        pickle.dump(small_data[:train_size], f)
+    with open('../data/val.pkl', 'wb') as f:
+        pickle.dump(small_data[train_size:], f)
     return class_num
 
 def extract_from_wav(wav_file, rate=11025):
@@ -213,7 +223,6 @@ if __name__ == "__main__":
         exp_dict = subset_dict
         print("breath training size is ", len(exp_dict))
     
-    exit()
 
     print("Build Vocabulary...")
     vocab.build(w_counter)
@@ -229,8 +238,15 @@ if __name__ == "__main__":
         y, sr = librosa.load(exp_dict[k]['wav_path'], sr=args.sr)
         # use raw
         if args.raw:
+            frames = []
             window_size = 100
-            exp_dict[k]['raw'] 
+            hop_size = 0
+            for t in range(0, len(y), 200):
+                frames.append(y[t:t+200])
+
+            exp_dict[k]['raw'] = np.asarray(frames)
+            exps.append(exp_dict[k])
+            continue
 
         # features from librosa
         mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40).T
@@ -256,7 +272,9 @@ if __name__ == "__main__":
     #recategorize_and_split('../data/data.json')
     with open('../data/vocab.pkl','wb') as f:
         pickle.dump(vocab, f)
+    '''
     load_embedding(vocab, '../data/glove.6B.50d.txt', 50)
     load_embedding(vocab, '../data/glove.6B.100d.txt', 100)
     load_embedding(vocab, '../data/glove.6B.200d.txt', 200)
     load_embedding(vocab, '../data/glove.6B.300d.txt', 300)
+    '''

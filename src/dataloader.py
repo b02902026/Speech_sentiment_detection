@@ -30,40 +30,54 @@ class IEMOCAP(Dataset):
         with open(data_path, 'rb') as f:
             self.data = pickle.load(f)
 
-
         all_mfcc = []
         all_chroma = []
         all_rmse = []
         all_zero_crossing = []
         all_audio = []
+        all_raw = []
 
-        for d in self.data:
-            all_mfcc.append(d['mfcc'])
-            all_chroma.append(d['chroma'])
-            all_rmse.append(d['rmse'])
-            all_zero_crossing.append(d['zero_crossing'])
-            #all_audio.append(d['audio'])
-            all_audio.append(d['audio'][:, :3])
+        max_s = 0
+        # process raw wav
+        if 'raw' in self.data[0]:
+            for d in self.data:
+                all_raw.append(d['raw'])
+            mean_raw, std_raw = get_mean_var(all_raw)
+            for d in self.data:
+                d['raw'] = (d['raw'] - mean_raw) / std_raw
+                max_s = max(max_s, d['raw'].shape[0])
+        
+        # process others
+        if 'mfcc' in self.data[0]:
+            for d in self.data:
+                all_mfcc.append(d['mfcc'])
+                all_chroma.append(d['chroma'])
+                all_rmse.append(d['rmse'])
+                all_zero_crossing.append(d['zero_crossing'])
+                #all_audio.append(d['audio'])
+                all_audio.append(np.concatenate((d['audio'][:, :8],d['audio'][:, 21:]), axis=1))
 
-        mean_mfcc, std_mfcc = get_mean_var(all_mfcc)
-        mean_chroma, std_chroma = get_mean_var(all_chroma)
-        mean_rmse, std_rmse = get_mean_var(all_rmse)
-        mean_zero_crossing, std_zero_crossing = get_mean_var(all_zero_crossing)
-        mean_audio, std_audio = get_mean_var(all_audio)
-        
-        for d in self.data:
-            d['mfcc'] = (d['mfcc'] - mean_mfcc) / std_mfcc
-            d['chroma'] = (d['chroma'] - mean_chroma) / std_chroma
-            d['rmse'] = (d['rmse'] - mean_rmse) / std_rmse
-            d['zero_crossing'] = (d['zero_crossing'] - mean_zero_crossing) / std_zero_crossing
-            #d['audio'] = (d['audio'] - mean_audio) / std_audio
-            d['audio'] = (d['audio'][:, :3] - mean_audio) / std_audio
-        
+
+            mean_mfcc, std_mfcc = get_mean_var(all_mfcc)
+            mean_chroma, std_chroma = get_mean_var(all_chroma)
+            mean_rmse, std_rmse = get_mean_var(all_rmse)
+            mean_zero_crossing, std_zero_crossing = get_mean_var(all_zero_crossing)
+            mean_audio, std_audio = get_mean_var(all_audio)
+            
+            for d in self.data:
+                d['mfcc'] = (d['mfcc'] - mean_mfcc) / std_mfcc
+                d['chroma'] = (d['chroma'] - mean_chroma) / std_chroma
+                d['rmse'] = (d['rmse'] - mean_rmse) / std_rmse
+                d['zero_crossing'] = (d['zero_crossing'] - mean_zero_crossing) / std_zero_crossing
+                #d['audio'] = (d['audio'] - mean_audio) / std_audio
+                d['audio'] = (np.concatenate((d['audio'][:, :8],d['audio'][:, 21:]), axis=1) - mean_audio) / std_audio
+                
+                max_s = max(max_s, d['mfcc'].shape[0])
         
 
         # TODO: may need to modify
-        self.max_time_step = 736
-        self.max_au_time_step = 1063
+        #self.max_time_step = 736
+        #self.max_au_time_step = 1063
         #self.max_time_step = max([x.shape[0] for x in all_mfcc])
         #self.max_time_step = max([x.shape[0] for x in all_audio])
         '''
@@ -73,6 +87,7 @@ class IEMOCAP(Dataset):
             self.max_time_step = 1063
         '''
         self.max_time_step = 1063
+        #self.max_time_step = 1471
 
     
     def __getitem__(self, index):
@@ -95,6 +110,8 @@ class IEMOCAP(Dataset):
             speech_feats = self.data[index]['mfcc']
         elif self.feat_size == 34:
             speech_feats = self.data[index]['audio']
+        elif self.feat_size == -1:   # use raw signal input
+            speech_feats = self.data[index]['raw']
                        
         label = self.data[index]['category_index']
         #if "text" in self.data[index]:
